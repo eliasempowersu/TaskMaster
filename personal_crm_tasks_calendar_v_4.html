@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tasks & Calendar</title>
+  <style>
+    :root{
+      /* Muted luxury (sage/stone/ink) */
+      --bg:#dfe4e0;        /* sage-grey canvas */
+      --panel:#ffffff;     /* crisp cards/panels */
+      --muted:#e7ebe8;     /* soft chips/controls */
+      --soft:#eef1ef;      /* segmented controls */
+      --text:#101112;      /* near-black */
+      --sub:#6b7280;       /* cool grey */
+      --brand:#111111;     /* primary accent = ink */
+      --ok:#0f8a5f;
+      --warn:#d97706;
+      --danger:#dc2626;
+      --violet:#312e81;
+      --radius:22px;       /* rounder corners */
+      --shadow:0 10px 30px rgba(0,0,0,.06);
+    }
+    *{box-sizing:border-box}
+    body{margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji"; background:var(--bg); color:var(--text); line-height:1.45}
+    a{color:inherit}
+    .container{max-width:1400px; margin:0 auto; padding:32px}
+
+    /* Topbar */
+    .topbar{display:flex; align-items:center; gap:12px; justify-content:space-between; margin-bottom:22px}
+    .actions{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+    .btn{border:none; border-radius:14px; padding:12px 16px; background:var(--panel); color:var(--text); cursor:pointer; transition:.2s transform, .2s opacity; display:inline-flex; gap:8px; align-items:center; font-weight:600; font-size:14px; border:1px solid #e3e6e4}
+    .btn:hover{transform:translateY(-2px); opacity:.92}
+    .btn.primary{background:var(--brand); color:#fff; border-color:#111; box-shadow:0 6px 16px rgba(0,0,0,.08)}
+    .btn.ghost{background:transparent}
+    .seg{display:flex; background:var(--soft); border-radius:14px; padding:4px; border:1px solid #e3e6e4}
+    .seg button{background:transparent; border:none; color:var(--sub); padding:10px 14px; border-radius:12px; cursor:pointer; font-weight:600}
+    .seg button.active{background:var(--muted); color:var(--text)}
+    .search{position:relative}
+    .search input{background:#fff; border:1px solid #d9dddb; color:var(--text); padding:12px 40px 12px 14px; border-radius:14px; min-width:280px; font-size:14px}
+    .search .icon{position:absolute; right:12px; top:10px; opacity:.55; font-size:16px}
+    select.inline{background:#fff; border:1px solid #d9dddb; color:var(--text); padding:12px; border-radius:14px; font-size:14px}
+
+    /* Filters */
+    .filters{display:flex; gap:12px; flex-wrap:wrap; margin:6px 0 18px}
+    .pill{background:#fff; border:1px solid #e3e6e4; color:var(--sub); padding:10px 14px; border-radius:999px; cursor:pointer; font-size:13px; font-weight:600}
+    .pill.active{color:var(--text); background:var(--panel); border-color:#bfc5c2}
+
+    /* Grid view */
+    .columns{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px}
+    .col{background:var(--panel); border:1px solid #e3e6e4; border-radius:var(--radius); padding:18px; min-height:240px; display:flex; flex-direction:column; box-shadow:var(--shadow)}
+    .col h3{margin:2px 4px 12px; font-size:15px; color:var(--sub); display:flex; justify-content:space-between; align-items:center; font-weight:700; letter-spacing:-0.2px}
+    .list{display:flex; flex-direction:column; gap:14px}
+    .card{background:#fff; border:1px solid #e3e6e4; border-radius:calc(var(--radius) - 4px); padding:16px; box-shadow:0 8px 18px rgba(0,0,0,.05)}
+    .card h4{margin:0 0 8px; font-size:16px; font-weight:700; letter-spacing:-0.2px}
+    .subrow{display:flex; gap:8px; flex-wrap:wrap; align-items:center; font-size:13px; color:var(--sub)}
+    .status{padding:5px 10px; border-radius:999px; font-weight:700; border:1px solid #d9dddb; font-size:12px}
+    .status.Active{background:#e8f0ff; color:#1a4ed8}
+    .status.Pending{background:#fff5e0; color:#b45309}
+    .status.Completed{background:#e0f7ef; color:#047857}
+    .dates{margin-top:8px; font-size:13px; color:var(--sub)}
+    .tag{font-size:12px; padding:5px 10px; background:#f4f6f5; border:1px solid #d9dddb; border-radius:999px}
+    .card .row{display:flex; justify-content:space-between; align-items:center; gap:8px}
+    .muted{color:var(--sub)}
+
+    .iconbtn{background:transparent; border:1px solid #d9dddb; color:var(--sub); border-radius:12px; padding:6px 8px; cursor:pointer; font-size:13px}
+    .iconbtn:hover{color:var(--text)}
+
+    /* Table */
+    table{width:100%; border-collapse:collapse; background:var(--panel); border:1px solid #e3e6e4; border-radius:var(--radius); overflow:hidden}
+    th, td{padding:14px 12px; border-bottom:1px solid #eef1ef; font-size:14px}
+    th{background:#f4f6f5; text-align:left; color:#0f1115; user-select:none; cursor:pointer; font-weight:700}
+    tr:hover td{background:#fafbfa}
+
+    /* Modal */
+    .modal{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.22); backdrop-filter:blur(3px); z-index:20}
+    .modal.show{display:flex}
+    .sheet{width:min(720px, 92vw); background:var(--panel); border:1px solid #e3e6e4; border-radius:28px; box-shadow:0 24px 60px rgba(0,0,0,.18); padding:24px}
+    .sheet h3{margin:0 0 16px; font-size:20px; font-weight:700}
+    .grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+    .grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+    .field{display:flex; flex-direction:column; gap:6px}
+    label{font-size:12px; color:var(--sub); font-weight:600; letter-spacing:-0.2px}
+    input, select, textarea{background:#fff; border:1px solid #d9dddb; color:var(--text); border-radius:12px; padding:12px; font-size:14px}
+    textarea{min-height:96px; resize:vertical}
+    .sheet .row{display:flex; justify-content:flex-end; gap:10px; margin-top:16px}
+
+    /* Calendar */
+    .calendar-wrap{display:none}
+    .calendar-wrap.show{display:block}
+    .cal-head{display:flex; align-items:center; justify-content:space-between; margin:18px 0}
+    .cal-grid{display:grid; grid-template-columns:repeat(7, 1fr); gap:10px}
+    .dow{font-size:12px; color:var(--sub); text-align:center; font-weight:700; letter-spacing:-0.2px}
+    .day{background:var(--panel); border:1px solid #e3e6e4; border-radius:calc(var(--radius) - 6px); min-height:120px; padding:10px; display:flex; flex-direction:column; gap:8px}
+    .day .dnum{font-weight:800; font-size:13px; color:var(--sub)}
+    .badge{font-size:12px; padding:5px 8px; border-radius:10px; background:#fff; border:1px solid #d9dddb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600}
+    .today{outline:3px solid #111}
+
+    .empty{opacity:.6; font-style:italic}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="topbar">
+      <div class="actions">
+        <div class="search">
+          <input id="search" placeholder="Search tasks, next steps, notes" />
+          <span class="icon">🔎</span>
+        </div>
+        <select id="catFilter" class="inline">
+          <option value="All">All Categories</option>
+        </select>
+        <select id="statusFilter" class="inline">
+          <option value="All">All Statuses</option>
+          <option>Active</option>
+          <option>Pending</option>
+          <option>Completed</option>
+        </select>
+        <div class="seg" role="tablist">
+          <button id="tabTasks" class="active" aria-selected="true">Tasks</button>
+          <button id="tabCalendar" aria-selected="false">Calendar</button>
+        </div>
+        <button class="btn" id="manageCats">Categories</button>
+        <button class="btn primary" id="addTask">＋ Add Task</button>
+        <button class="btn" id="exportBtn">Export</button>
+        <label class="btn" for="importFile" style="cursor:pointer">Import<input id="importFile" type="file" accept="application/json" style="display:none"/></label>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters" id="filters"></div>
+
+    <!-- Views -->
+    <div id="views">
+      <div class="seg" style="margin-bottom:10px">
+        <button id="viewGrid" class="active">Grid</button>
+        <button id="viewTable">Table</button>
+      </div>
+
+      <!-- GRID VIEW -->
+      <div id="grid" class="grid-view">
+        <div class="columns" id="columns"></div>
+      </div>
+
+      <!-- TABLE VIEW -->
+      <div id="tableWrap" style="display:none">
+        <table id="table">
+          <thead>
+            <tr>
+              <th data-sort="title">Title</th>
+              <th data-sort="category">Category</th>
+              <th data-sort="status">Status</th>
+              <th data-sort="dueDate">Due</th>
+              <th>Next Steps</th>
+              <th data-sort="nextStepDate">Next Step Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CALENDAR VIEW -->
+    <div class="calendar-wrap" id="calendar">
+      <div class="cal-head">
+        <div class="seg">
+          <button id="calPrev">◀</button>
+          <button id="calToday">Today</button>
+          <button id="calNext">▶</button>
+        </div>
+        <div style="font-weight:800" id="calLabel"></div>
+        <div class="seg">
+          <button id="monthBtn" class="active">Month</button>
+          <button id="dayBtn">Day</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="dow"></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div id="dayList" style="margin-top:12px; display:none"></div>
+    </div>
+  </div>
+
+  <!-- TASK MODAL -->
+  <div class="modal" id="modal">
+    <div class="sheet">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+        <h3 id="modalTitle">Add Task</h3>
+        <button class="iconbtn" id="closeModal">✕</button>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label>Title *</label>
+          <input id="f_title" placeholder="e.g., Follow up with service team" />
+        </div>
+        <div class="field">
+          <label>Category *</label>
+          <select id="f_category"></select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f_status">
+            <option>Active</option>
+            <option>Pending</option>
+            <option>Completed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Due Date</label>
+          <input id="f_due" type="date" />
+        </div>
+        <div class="field">
+          <label>Next Step</label>
+          <textarea id="f_next" placeholder="e.g., Call Julie to confirm schedule"></textarea>
+        </div>
+        <div class="field">
+          <label>Next Step Date</label>
+          <input id="f_nextdate" type="date" />
+        </div>
+        <div class="field" style="grid-column:1 / -1">
+          <label>Notes</label>
+          <textarea id="f_notes" placeholder="Optional notes"></textarea>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn ghost" id="deleteBtn" style="display:none">Delete</button>
+        <div style="flex:1"></div>
+        <button class="btn" id="saveDraft">Save</button>
+        <button class="btn primary" id="saveTask">Save & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CATEGORY MODAL -->
+  <div class="modal" id="catModal">
+    <div class="sheet">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+        <h3>Manage Categories</h3>
+        <button class="iconbtn" id="closeCat">✕</button>
+      </div>
+      <div class="grid-3" id="catList" style="margin-bottom:12px"></div>
+      <div class="row" style="justify-content:flex-start">
+        <input id="newCat" placeholder="New category name" />
+        <button class="btn" id="addCat">Add</button>
+        <div style="flex:1"></div>
+        <button class="btn ghost" id="resetCats">Reset Defaults</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
+      } else {
+        start();
+      }
+      function start(){
+        // -----------------------------
+        // Data & Persistence
+        // -----------------------------
+        const LSK_TASKS = 'personal_crm_tasks_v1';
+        const LSK_CATS   = 'personal_crm_categories_v1';
+        const DEFAULT_CATEGORIES = ['Dealership','Family','Business','Spiritual','Personal','Uncategorized'];
+
+        let categories = [];
+        let tasks = [];
+        let selectedCats = new Set();
+        let sortKey = 'dueDate';
+        let sortAsc = true;
+
+        const els = {
+          filters: document.getElementById('filters'),
+          columns: document.getElementById('columns'),
+          tableWrap: document.getElementById('tableWrap'),
+          tbody: document.getElementById('tbody'),
+          grid: document.getElementById('grid'),
+          views: document.getElementById('views'),
+          calendar: document.getElementById('calendar'),
+          catFilter: document.getElementById('catFilter'),
+          statusFilter: document.getElementById('statusFilter'),
+          search: document.getElementById('search'),
+          viewGrid: document.getElementById('viewGrid'),
+          viewTable: document.getElementById('viewTable'),
+          tabTasks: document.getElementById('tabTasks'),
+          tabCalendar: document.getElementById('tabCalendar'),
+          addTask: document.getElementById('addTask'),
+          exportBtn: document.getElementById('exportBtn'),
+          importFile: document.getElementById('importFile'),
+          manageCats: document.getElementById('manageCats'),
+          // task modal
+          modal: document.getElementById('modal'),
+          modalTitle: document.getElementById('modalTitle'),
+          closeModal: document.getElementById('closeModal'),
+          f_title: document.getElementById('f_title'),
+          f_category: document.getElementById('f_category'),
+          f_status: document.getElementById('f_status'),
+          f_due: document.getElementById('f_due'),
+          f_next: document.getElementById('f_next'),
+          f_nextdate: document.getElementById('f_nextdate'),
+          f_notes: document.getElementById('f_notes'),
+          saveDraft: document.getElementById('saveDraft'),
+          saveTask: document.getElementById('saveTask'),
+          deleteBtn: document.getElementById('deleteBtn'),
+          // category modal
+          catModal: document.getElementById('catModal'),
+          closeCat: document.getElementById('closeCat'),
+          addCat: document.getElementById('addCat'),
+          newCat: document.getElementById('newCat'),
+          resetCats: document.getElementById('resetCats'),
+          catList: document.getElementById('catList'),
+          // calendar
+          calPrev: document.getElementById('calPrev'),
+          calNext: document.getElementById('calNext'),
+          calToday: document.getElementById('calToday'),
+          monthBtn: document.getElementById('monthBtn'),
+          dayBtn: document.getElementById('dayBtn'),
+          calLabel: document.getElementById('calLabel'),
+          dow: document.getElementById('dow'),
+          calGrid: document.getElementById('calGrid'),
+          dayList: document.getElementById('dayList'),
+        };
+
+        let editingId = null;
+        let currentView = 'grid';
+        let currentTab = 'tasks';
+
+        function uid(){ return Math.random().toString(36).slice(2,10); }
+        function todayISO(){ return new Date().toISOString().slice(0,10); }
+        function fmtShort(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString(undefined,{month:'short',day:'numeric'}); }
+        function overdue(iso){ if(!iso) return false; return new Date(iso+'T23:59:59') < new Date(); }
+        function dueSoon(iso,days=3){ if(!iso) return false; const t=new Date(); const f=new Date(); f.setDate(t.getDate()+days); const d=new Date(iso); return d>=new Date(t.toDateString()) && d<=f; }
+
+        function load(){
+          try{ categories = JSON.parse(localStorage.getItem(LSK_CATS)) || [...DEFAULT_CATEGORIES]; }catch{ categories=[...DEFAULT_CATEGORIES]; }
+          if(!categories.map(c=>c.toLowerCase()).includes('uncategorized')) categories.push('Uncategorized');
+          categories = Array.from(new Set(categories.map(c=>c.trim()).filter(Boolean)));
+          try{ tasks = JSON.parse(localStorage.getItem(LSK_TASKS)) || seedTasks(); }catch{ tasks = seedTasks(); }
+          selectedCats = new Set(categories); // all on
+          renderCatDropdowns();
+        }
+        function save(){ localStorage.setItem(LSK_TASKS, JSON.stringify(tasks)); localStorage.setItem(LSK_CATS, JSON.stringify(categories)); }
+
+        function seedTasks(){
+          return [
+            {id:uid(), title:'Follow up with BMW lead pipeline', category: pick('Dealership'), status:'Active', dueDate:offset(1), createdAt:new Date().toISOString(), nextSteps:[{id:uid(), text:'Call Grace re: X3 allocation', dueDate:todayISO()}], notes:''},
+            {id:uid(), title:'Date night plan', category: pick('Family'), status:'Pending', dueDate:offset(4), createdAt:new Date().toISOString(), nextSteps:[{id:uid(), text:'Check babysitter availability', dueDate:offset(2)}], notes:''},
+            {id:uid(), title:'MG Capital deck tweaks', category: pick('Business'), status:'Active', dueDate:offset(2), createdAt:new Date().toISOString(), nextSteps:[{id:uid(), text:'Add NDA step', dueDate:offset(2)}], notes:''},
+            {id:uid(), title:'Morning prayer & study', category: pick('Spiritual'), status:'Active', createdAt:new Date().toISOString(), nextSteps:[{id:uid(), text:'Set 5:15am alarm'}], notes:''},
+            {id:uid(), title:'Gym – upper body', category: pick('Personal'), status:'Pending', dueDate:offset(6), createdAt:new Date().toISOString(), nextSteps:[{id:uid(), text:'Pack gym bag tonight', dueDate:offset(5)}], notes:''},
+          ];
+          function offset(n){ return new Date(Date.now()+n*86400000).toISOString().slice(0,10); }
+          function pick(name){ return categories.includes(name)?name:categories[0]; }
+        }
+
+        // -----------------------------
+        // Rendering
+        // -----------------------------
+        function renderAll(){
+          renderFilters();
+          if(currentTab==='tasks'){
+            if(currentView==='grid') renderGrid(); else renderTable();
+            els.calendar.classList.remove('show');
+            els.views.style.display='block';
+          } else {
+            renderCalendar();
+          }
+        }
+
+        function renderCatDropdowns(){
+          els.catFilter.innerHTML = '<option value="All">All Categories</option>' + categories.map(c=>`<option>${c}</option>`).join('');
+          els.f_category.innerHTML = categories.map(c=>`<option>${c}</option>`).join('');
+        }
+
+        function renderFilters(){
+          els.filters.innerHTML = categories.map(c=>{
+            const active = selectedCats.has(c)?'active':'';
+            return `<button class="pill ${active}" data-cat="${c}">${c}</button>`;
+          }).join('');
+          els.filters.querySelectorAll('button').forEach(btn=>{
+            btn.onclick = ()=>{ const c=btn.dataset.cat; if(selectedCats.has(c)) selectedCats.delete(c); else selectedCats.add(c); renderAll(); };
+          });
+        }
+
+        function filteredSorted(list){
+          const q = els.search.value.trim().toLowerCase();
+          const catSel = els.catFilter.value;
+          const statusSel = els.statusFilter.value;
+          let arr = list.filter(t=> selectedCats.has(t.category));
+          if(catSel!=='All') arr = arr.filter(t=>t.category===catSel);
+          if(statusSel!=='All') arr = arr.filter(t=>t.status===statusSel);
+          if(q) arr = arr.filter(t=> (t.title+ ' ' + (t.notes||'') + ' ' + (t.nextSteps?.map(n=>n.text).join(' ')||'')).toLowerCase().includes(q));
+          arr.sort((a,b)=>{
+            let av, bv;
+            if(sortKey==='title'){ av=a.title; bv=b.title; }
+            else if(sortKey==='category'){ av=a.category; bv=b.category; }
+            else if(sortKey==='status'){ av=a.status; bv=b.status; }
+            else if(sortKey==='nextStepDate'){ av=nearestNextDate(a)||'9999'; bv=nearestNextDate(b)||'9999'; }
+            else { av=a.dueDate||'9999'; bv=b.dueDate||'9999'; }
+            const cmp = String(av||'').localeCompare(String(bv||''));
+            return sortAsc?cmp:-cmp;
+          });
+          return arr;
+        }
+
+        function nearestNextDate(t){
+          const ds = (t.nextSteps||[]).map(n=>n.dueDate).filter(Boolean).sort();
+          return ds[0];
+        }
+
+        function renderGrid(){
+          els.tableWrap.style.display='none'; els.grid.style.display='block';
+          const map = {}; categories.forEach(c=>map[c]=[]);
+          filteredSorted(tasks).forEach(t=>{ (map[t.category]||(map[t.category]=[])).push(t); });
+          els.columns.innerHTML = Object.keys(map).map(cat=>{
+            const list = map[cat];
+            return `<div class="col">
+              <h3>${cat} <span class="muted">${list.length} tasks</span></h3>
+              <div class="list">${ list.map(card).join('') || `<div class="muted empty">No tasks.</div>` }</div>
+            </div>`;
+          }).join('');
+          // bind actions
+          els.columns.querySelectorAll('[data-edit]').forEach(b=> b.onclick = ()=> openEdit(b.dataset.id));
+          els.columns.querySelectorAll('[data-del]').forEach(b=> b.onclick = ()=> removeTask(b.dataset.id));
+          els.columns.querySelectorAll('[data-toggle]').forEach(b=> b.onclick = ()=> toggleComplete(b.dataset.id));
+        }
+
+        function card(t){
+          const nnDate = nearestNextDate(t);
+          const nn = (t.nextSteps||[]).find(n=>n.dueDate===nnDate) || (t.nextSteps||[])[0];
+          return `<div class="card">
+            <div class="row"><h4>${escapeHtml(t.title)}</h4>
+              <div>
+                <button class="iconbtn" data-edit data-id="${t.id}">✎</button>
+                <button class="iconbtn" data-del data-id="${t.id}">🗑</button>
+              </div>
+            </div>
+            <div class="subrow">
+              <span class="status ${t.status}">${t.status}</span>
+              ${t.dueDate?`<span class="tag ${overdue(t.dueDate)?'danger':(dueSoon(t.dueDate)?'warn':'')}">due ${fmtShort(t.dueDate)}</span>`:''}
+            </div>
+            ${nn?`<div class="dates">Next: <strong>${escapeHtml(nn.text)}</strong> ${nn.dueDate?`· ${fmtShort(nn.dueDate)}`:''}</div>`:''}
+            <div style="margin-top:8px"><button class="btn" data-toggle data-id="${t.id}">${t.status==='Completed'?'Mark Active':'Mark Completed'}</button></div>
+          </div>`;
+        }
+
+        function renderTable(){
+          els.tableWrap.style.display='block'; els.grid.style.display='none';
+          els.tbody.innerHTML = filteredSorted(tasks).map(t=>{
+            const nnText = (t.nextSteps&&t.nextSteps[0])? t.nextSteps[0].text : '—';
+            const nnDate = nearestNextDate(t);
+            return `<tr>
+              <td>${escapeHtml(t.title)}</td>
+              <td><span class="tag">${t.category}</span></td>
+              <td><span class="status ${t.status}">${t.status}</span></td>
+              <td>${fmtShort(t.dueDate)}</td>
+              <td>${escapeHtml(nnText)}</td>
+              <td>${fmtShort(nnDate)}</td>
+              <td>
+                <button class="iconbtn" data-edit data-id="${t.id}">✎</button>
+                <button class="iconbtn" data-del data-id="${t.id}">🗑</button>
+              </td>
+            </tr>`;
+          }).join('');
+          els.tbody.querySelectorAll('[data-edit]').forEach(b=> b.onclick = ()=> openEdit(b.dataset.id));
+          els.tbody.querySelectorAll('[data-del]').forEach(b=> b.onclick = ()=> removeTask(b.dataset.id));
+        }
+
+        function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+
+        // -----------------------------
+        // Calendar
+        // -----------------------------
+        let calCursor = new Date();
+        let calMode = 'month'; // 'month' | 'day'
+        function renderCalendar(){
+          els.calendar.classList.add('show');
+          els.views.style.display='none';
+          // DOW
+          els.dow.innerHTML = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="dow">${d}</div>`).join('');
+          const first = new Date(calCursor.getFullYear(), calCursor.getMonth(), 1);
+          const start = new Date(first); start.setDate(first.getDate()-first.getDay());
+          els.calLabel.textContent = calCursor.toLocaleString(undefined,{month:'long', year:'numeric'});
+          if(calMode==='month'){
+            els.dayList.style.display='none';
+            els.calGrid.innerHTML = Array.from({length:42},(_,i)=>{
+              const d = new Date(start); d.setDate(start.getDate()+i);
+              const iso = d.toISOString().slice(0,10);
+              const dayTasks = tasks.filter(t => t.dueDate===iso || (t.nextSteps||[]).some(n=>n.dueDate===iso));
+              const isToday = (new Date().toDateString()===d.toDateString());
+              return `<div class="day ${isToday?'today':''}" aria-label="${iso}">
+                <div class="dnum">${d.getDate()}</div>
+                ${dayTasks.slice(0,3).map(t=>`<div class="badge" title="${escapeHtml(t.title)}">${escapeHtml(t.title)}</div>`).join('')}
+                ${dayTasks.length>3?`<div class="muted" style="font-size:11px">+${dayTasks.length-3} more…</div>`:''}
+              </div>`;
+            }).join('');
+          } else {
+            // day mode
+            els.calGrid.innerHTML = '';
+            const iso = calCursor.toISOString().slice(0,10);
+            const dayTasks = tasks.filter(t => t.dueDate===iso || (t.nextSteps||[]).some(n=>n.dueDate===iso));
+            els.dayList.style.display='block';
+            els.dayList.innerHTML = dayTasks.length? `<ul>${dayTasks.map(t=>`<li class="card" style="margin-bottom:8px">${escapeHtml(t.title)} <span class="tag">${t.category}</span> <span class="status ${t.status}">${t.status}</span></li>`).join('')}</ul>` : '<div class="muted">No tasks for this date.</div>';
+          }
+        }
+
+        // -----------------------------
+        // Modal helpers
+        // -----------------------------
+        function openAdd(){ editingId=null; els.modalTitle.textContent='Add Task'; els.deleteBtn.style.display='none'; fillTaskForm({title:'', category: categories[0]||'Uncategorized', status:'Active', dueDate:'', nextSteps:[], notes:''}); showModal(true); }
+        function openEdit(id){ const t=tasks.find(x=>x.id===id); if(!t) return; editingId=id; els.modalTitle.textContent='Edit Task'; els.deleteBtn.style.display='inline-flex'; fillTaskForm(t); showModal(true); }
+        function showModal(v){ els.modal.classList.toggle('show', !!v); }
+
+        function fillTaskForm(t){
+          // populate category select from live categories
+          els.f_category.innerHTML = categories.map(c=>`<option ${t.category===c?'selected':''}>${c}</option>`).join('');
+          els.f_title.value = t.title||'';
+          els.f_status.value = t.status||'Active';
+          els.f_due.value = t.dueDate||'';
+          els.f_next.value = (t.nextSteps&&t.nextSteps[0])? t.nextSteps[0].text : '';
+          els.f_nextdate.value = (t.nextSteps&&t.nextSteps[0]&&t.nextSteps[0].dueDate) ? t.nextSteps[0].dueDate : '';
+          els.f_notes.value = t.notes||'';
+        }
+
+        function readTaskForm(){
+          const base = {
+            title: els.f_title.value.trim(),
+            category: els.f_category.value,
+            status: els.f_status.value,
+            dueDate: els.f_due.value || undefined,
+            notes: els.f_notes.value.trim(),
+          };
+          const nstext = els.f_next.value.trim();
+          const nsdate = els.f_nextdate.value;
+          const nextSteps = nstext? [{id: uid(), text: nstext, dueDate: nsdate||undefined}] : [];
+          return {...base, nextSteps};
+        }
+
+        function saveTask(closeAfter){
+          const data = readTaskForm();
+          if(!data.title) { alert('Title is required'); return; }
+          if(!categories.includes(data.category)) data.category='Uncategorized';
+          if(editingId){
+            tasks = tasks.map(t=> t.id===editingId? {...t,...data} : t);
+          } else {
+            tasks = [{id:uid(), createdAt:new Date().toISOString(), ...data}, ...tasks];
+          }
+          save();
+          renderAll();
+          if(closeAfter) showModal(false);
+        }
+
+        function removeTask(id){ if(!confirm('Delete this task?')) return; tasks = tasks.filter(t=>t.id!==id); save(); renderAll(); }
+        function toggleComplete(id){ tasks = tasks.map(t=> t.id===id? {...t, status: t.status==='Completed'?'Active':'Completed'} : t); save(); renderAll(); }
+
+        // -----------------------------
+        // Categories
+        // -----------------------------
+        function openCats(){ renderCatModal(); els.catModal.classList.add('show'); }
+        function closeCats(){ els.catModal.classList.remove('show'); }
+        function renderCatModal(){
+          els.catList.innerHTML = categories.map(c=>{
+            const disabled = (c==='Uncategorized');
+            return `<div class="card" style="display:flex; align-items:center; justify-content:space-between; gap:8px">
+              <div>${c}</div>
+              <button class="iconbtn" data-remove="${c}" ${disabled?'disabled':''}>🗑</button>
+            </div>`;
+          }).join('');
+          els.catList.querySelectorAll('[data-remove]').forEach(b=>{
+            b.onclick = ()=>{ const name=b.getAttribute('data-remove'); if(name==='Uncategorized') return; if(!confirm(`Remove category \"${name}\"? Tasks will move to 'Uncategorized'.`)) return; tasks = tasks.map(t=> t.category===name? {...t, category:'Uncategorized'}:t); categories = categories.filter(c=>c!==name); save(); selectedCats = new Set(categories); renderAll(); renderCatModal(); };
+          });
+        }
+
+        // -----------------------------
+        // Events
+        // -----------------------------
+        els.viewGrid.onclick = ()=>{ currentView='grid'; els.grid.style.display='block'; els.tableWrap.style.display='none'; renderGrid(); };
+        els.viewTable.onclick = ()=>{ currentView='table'; els.grid.style.display='none'; els.tableWrap.style.display='block'; renderTable(); };
+
+        els.tabTasks.onclick = ()=>{ currentTab='tasks'; els.calendar.classList.remove('show'); els.views.style.display='block'; renderAll(); };
+        els.tabCalendar.onclick = ()=>{ currentTab='calendar'; renderCalendar(); };
+
+        els.addTask.onclick = openAdd;
+        els.closeModal.onclick = ()=> showModal(false);
+        els.saveDraft.onclick = ()=> saveTask(false);
+        els.saveTask.onclick = ()=> saveTask(true);
+        els.deleteBtn.onclick = ()=>{ if(editingId) removeTask(editingId); showModal(false); };
+
+        els.manageCats.onclick = openCats;
+        els.closeCat.onclick = closeCats;
+        els.addCat.onclick = ()=>{
+          const name = els.newCat.value.trim();
+          if(!name) return alert("Category name can't be empty.");
+          if(name.toLowerCase()==='uncategorized') return alert("'Uncategorized' already exists.");
+          if(categories.map(c=>c.toLowerCase()).includes(name.toLowerCase())) return alert('Category already exists.');
+          categories = [...categories.filter(c=>c!=='Uncategorized'), name, 'Uncategorized'];
+          selectedCats = new Set(categories);
+          els.newCat.value='';
+          save(); renderAll(); renderCatModal();
+        };
+        els.resetCats.onclick = ()=>{ if(!confirm('Reset categories to defaults?')) return; categories=[...DEFAULT_CATEGORIES]; tasks = tasks.map(t=> categories.includes(t.category)? t : {...t, category:'Uncategorized'}); selectedCats = new Set(categories); save(); renderAll(); renderCatModal(); };
+
+        els.catFilter.onchange = ()=> renderAll();
+        els.statusFilter.onchange = ()=> renderAll();
+        els.search.oninput = ()=> renderAll();
+
+        document.querySelectorAll('th[data-sort]').forEach(th=>{
+          th.onclick = ()=>{ const key=th.getAttribute('data-sort'); if(sortKey===key) sortAsc=!sortAsc; else { sortKey=key; sortAsc=true; } renderTable(); };
+        });
+
+        // Export/Import
+        els.exportBtn.onclick = ()=>{
+          const blob = new Blob([JSON.stringify({tasks, categories}, null, 2)], {type:'application/json'});
+          const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`personal-crm-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(url);
+        };
+        els.importFile.onchange = (e)=>{
+          const file = e.target.files && e.target.files[0]; if(!file) return; const reader=new FileReader(); reader.onload=()=>{ try{ const data=JSON.parse(String(reader.result)); if(Array.isArray(data)) tasks=data; else { tasks=data.tasks||tasks; categories=data.categories||categories; } save(); selectedCats=new Set(categories); renderAll(); }catch(err){ alert('Invalid JSON'); } }; reader.readAsText(file); e.target.value='';
+        };
+
+        // Calendar navigation
+        els.calPrev.onclick = ()=>{ calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()-1, 1); renderCalendar(); };
+        els.calNext.onclick = ()=>{ calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()+1, 1); renderCalendar(); };
+        els.calToday.onclick = ()=>{ calCursor = new Date(); renderCalendar(); };
+        els.monthBtn.onclick = ()=>{ calMode='month'; els.monthBtn.classList.add('active'); els.dayBtn.classList.remove('active'); renderCalendar(); };
+        els.dayBtn.onclick = ()=>{ calMode='day'; els.dayBtn.classList.add('active'); els.monthBtn.classList.remove('active'); renderCalendar(); };
+
+        // -----------------------------
+        // Init
+        // -----------------------------
+        load();
+        renderAll();
+      }
+
+      // Error banner helper
+      window.addEventListener('error', (e)=>{
+        const id='errBanner';
+        if(!document.getElementById(id)){
+          const b=document.createElement('div');
+          b.id=id; b.style.cssText='position:fixed;bottom:12px;left:12px;background:#111;color:#fff;padding:10px 12px;border-radius:8px;z-index:9999;font:12px ui-sans-serif';
+          b.textContent='Script error: '+(e.error?.message||e.message);
+          document.body.appendChild(b);
+          setTimeout(()=>b.remove(), 6000);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
