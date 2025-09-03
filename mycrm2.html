@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <title>Personal CRM — Tasks & Calendar</title>
+  <style>
+    :root{
+      --bg:#e9ece9; --panel:#ffffff; --muted:#eef1ef; --soft:#f6f8f7; --text:#0f1115; --sub:#6b7280; --brand:#111111;
+      --radius:20px; --shadow:0 10px 30px rgba(0,0,0,.06);
+      --safe-top: env(safe-area-inset-top); --safe-bottom: env(safe-area-inset-bottom);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system; background:var(--bg); color:var(--text);}
+    .container{max-width:1100px;margin:0 auto;padding:12px 16px calc(16px + var(--safe-bottom));}
+    .topbar{position:sticky;top:0;z-index:10;background:#f0f2f0;padding:calc(6px + var(--safe-top)) 0 10px;margin-bottom:12px;border-bottom:1px solid #dde3df}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .btn{border:none;border-radius:14px;padding:10px 14px;background:var(--panel);color:var(--text);cursor:pointer;font-weight:700;border:1px solid #e3e6e4}
+    .btn.primary{background:var(--brand);color:#fff}
+    .seg{display:flex;background:var(--soft);border-radius:14px;padding:4px;border:1px solid #e3e6e4}
+    .seg button{background:transparent;border:none;color:var(--sub);padding:8px 12px;border-radius:12px;cursor:pointer;font-weight:700}
+    .seg button.active{background:#fff;color:var(--text)}
+    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0}
+    .metric{background:var(--panel);border:1px solid #e3e6e4;border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+    .metric .label{font-size:12px;color:var(--sub)}
+    .metric .value{font-size:22px;font-weight:800;margin-top:4px}
+    table{width:100%;border-collapse:collapse;background:var(--panel)}
+    th,td{padding:10px;border-bottom:1px solid #eef1ef;font-size:14px}
+    th{background:#f4f6f5;text-align:left}
+    .calendar-wrap{display:none}
+    .calendar-wrap.show{display:block}
+    .cal-head{display:flex;justify-content:space-between;margin:14px 0}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+    .day{background:var(--panel);border:1px solid #e3e6e4;border-radius:14px;min-height:80px;padding:6px;font-size:12px}
+    .modal{position:fixed;inset:0;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.3);z-index:50}
+    .modal.show{display:flex!important}
+    .sheet{width:100%;max-width:560px;background:var(--panel);border-radius:24px 24px 0 0;padding:16px}
+    .field{margin-bottom:10px;display:flex;flex-direction:column}
+    label{font-size:12px;color:var(--sub)}
+    input,select{border:1px solid #d9dddb;border-radius:12px;padding:8px}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="container">
+      <div class="actions">
+        <div class="seg"><button id="tabTasks" class="active">Tasks</button><button id="tabCalendar">Calendar</button></div>
+        <button class="btn primary" id="addTask">＋ Add Task</button>
+        <button class="btn" id="manageCats">Categories</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="metrics" id="metrics"></div>
+    <div id="views">
+      <div id="tableWrap"><table><thead><tr><th>Title</th><th>Category</th><th>Status</th><th>Due</th><th>Next Step</th></tr></thead><tbody id="tbody"></tbody></table></div>
+    </div>
+    <div class="calendar-wrap" id="calendar">
+      <div class="cal-head"><button id="calPrev">◀</button><span id="calLabel"></span><button id="calNext">▶</button></div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+  </div>
+
+  <!-- Task Modal -->
+  <div class="modal" id="modal"><div class="sheet">
+    <h3 id="modalTitle">Add Task</h3>
+    <div class="field"><label>Title</label><input id="f_title"></div>
+    <div class="field"><label>Category</label><select id="f_category"></select></div>
+    <div class="field"><label>Status</label><select id="f_status"><option>Active</option><option>Pending</option><option>Completed</option></select></div>
+    <div class="field"><label>Due Date</label><input type="date" id="f_due"></div>
+    <div class="field"><label>Next Step</label><input id="f_next"></div>
+    <button class="btn primary" id="saveTask">Save</button>
+    <button class="btn" id="closeModal">Close</button>
+  </div></div>
+
+  <!-- Category Modal -->
+  <div class="modal" id="catModal"><div class="sheet">
+    <h3>Categories</h3>
+    <div id="catList"></div>
+    <input id="newCat" placeholder="New category"/>
+    <button class="btn" id="addCat">Add</button>
+    <button class="btn" id="closeCat">Close</button>
+  </div></div>
+
+  <script>
+// Personal CRM – metrics + calendar toggle enabled
+(function(){
+  // ---------- Helpers & Seed ----------
+  const DEFAULT_CATEGORIES=['Dealership','Family','Business','Spiritual','Personal','Uncategorized'];
+  const plusDays=(n)=>{const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10)};
+  let categories=[...DEFAULT_CATEGORIES];
+  let tasks=[
+    {id:'1',title:'Follow up BMW X3',category:'Dealership',status:'Active',dueDate:plusDays(1),nextStep:'Call Grace'},
+    {id:'2',title:'Family dinner',category:'Family',status:'Pending',dueDate:plusDays(3),nextStep:'Book restaurant'}
+  ];
+
+  // ---------- State ----------
+  let currentView='table'; // 'table' | 'grid'
+  let currentTab='tasks';  // 'tasks' | 'calendar'
+  let calCursor=new Date();
+
+  // ---------- Elements ----------
+  const els={
+    // lists
+    tbody:document.getElementById('tbody'),
+    columns:document.getElementById('columns'),
+    // metrics
+    metrics:document.getElementById('metrics'),
+    // top toggles
+    tabTasks:document.getElementById('tabTasks'),
+    tabCalendar:document.getElementById('tabCalendar'),
+    viewGrid:document.getElementById('viewGrid'),
+    viewTable:document.getElementById('viewTable'),
+    // calendar
+    calendar:document.getElementById('calendar'),
+    calGrid:document.getElementById('calGrid'),
+    calPrev:document.getElementById('calPrev'),
+    calNext:document.getElementById('calNext'),
+    calLabel:document.getElementById('calLabel'),
+    // modals / buttons
+    modal:document.getElementById('modal'),
+    f_title:document.getElementById('f_title'),
+    f_category:document.getElementById('f_category'),
+    f_status:document.getElementById('f_status'),
+    f_due:document.getElementById('f_due'),
+    f_next:document.getElementById('f_next'),
+    saveTask:document.getElementById('saveTask'),
+    closeModal:document.getElementById('closeModal'),
+    addTask:document.getElementById('addTask'),
+    // cats modal
+    catModal:document.getElementById('catModal'),
+    manageCats:document.getElementById('manageCats'),
+    catList:document.getElementById('catList'),
+    addCat:document.getElementById('addCat'),
+    newCat:document.getElementById('newCat'),
+    closeCat:document.getElementById('closeCat'),
+  };
+
+  // ---------- Metrics ----------
+  const fmtShort=(iso)=> iso? new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'}) : '';
+  const isOverdue=(iso)=> iso && new Date(iso+'T23:59:59') < new Date();
+  const isSoon=(iso,days=3)=>{
+    if(!iso) return false; const now=new Date(); const end=new Date(); end.setDate(now.getDate()+days);
+    const d=new Date(iso); d.setHours(23,59,59,999);
+    return d>=new Date(now.toDateString()) && d<=end;
+  };
+  function renderMetrics(){
+    const total=tasks.length;
+    const active=tasks.filter(t=>t.status!=='Completed').length;
+    const dueSoon=tasks.filter(t=>isSoon(t.dueDate)).length;
+    const overdue=tasks.filter(t=>isOverdue(t.dueDate)).length;
+    els.metrics.innerHTML=`
+      <div class="metric"><div class="label">Total Tasks</div><div class="value">${total}</div><div class="sub">All categories</div></div>
+      <div class="metric"><div class="label">Active</div><div class="value">${active}</div><div class="sub">Not completed</div></div>
+      <div class="metric"><div class="label">Due ≤ 3 Days</div><div class="value">${dueSoon}</div><div class="sub">Upcoming</div></div>
+      <div class="metric"><div class="label">Overdue</div><div class="value">${overdue}</div><div class="sub">Past due</div></div>`;
+  }
+
+  // ---------- Renderers ----------
+  function renderTable(){
+    els.tbody.innerHTML=tasks.map(t=>
+      `<tr>
+        <td>${t.title}</td>
+        <td>${t.category}</td>
+        <td>${t.status}</td>
+        <td>${fmtShort(t.dueDate)}</td>
+        <td>${t.nextStep||''}</td>
+        <td><button class='iconbtn' data-edit='${t.id}'>✎</button></td>
+      </tr>`
+    ).join('');
+    els.tbody.querySelectorAll('[data-edit]').forEach(b=>{
+      b.addEventListener('click',()=> editTask(b.getAttribute('data-edit')));
+    });
+  }
+  function renderGrid(){
+    const byCat=Object.fromEntries(categories.map(c=>[c,[]]));
+    tasks.forEach(t=>{ (byCat[t.category]||(byCat[t.category]=[])).push(t); });
+    els.columns.innerHTML=Object.entries(byCat).map(([cat,list])=>`
+      <div class='col'>
+        <h3>${cat} <span class='muted'>${list.length} tasks</span></h3>
+        ${list.map(t=>`<div class='card'>
+          <div style='display:flex;justify-content:space-between;align-items:center;gap:8px'>
+            <strong>${t.title}</strong><span class='status ${t.status}'>${t.status}</span>
+          </div>
+          <div style='margin-top:6px;font-size:12px;color:#6b7280'>${fmtShort(t.dueDate)}${t.nextStep?` · Next: ${t.nextStep}`:''}</div>
+        </div>`).join('')}
+      </div>`).join('');
+  }
+  function renderCalendar(){
+    // month grid (7x6)
+    const year=calCursor.getFullYear(), month=calCursor.getMonth();
+    els.calLabel.textContent=calCursor.toLocaleString(undefined,{month:'long',year:'numeric'});
+    const first=new Date(year,month,1); const start=new Date(first); start.setDate(first.getDate()-first.getDay());
+    const days=[]; for(let i=0;i<42;i++){ const d=new Date(start); d.setDate(start.getDate()+i); days.push(d); }
+    els.calGrid.innerHTML=days.map(d=>{
+      const iso=d.toISOString().slice(0,10);
+      const dayTasks=tasks.filter(t=>t.dueDate===iso);
+      const badges=dayTasks.slice(0,3).map(t=>`<div class='badge' style='font-size:11px;border:1px solid #d9dddb;border-radius:10px;padding:2px 6px;margin-top:4px'>${t.title}</div>`).join('');
+      const more=dayTasks.length>3? `<div style='font-size:11px;color:#6b7280;margin-top:2px'>+${dayTasks.length-3} more</div>` : '';
+      const today = (new Date().toDateString()===d.toDateString())? ' style="outline:2px solid #111"' : '';
+      return `<div class='day'${today}><div style='font-size:12px;color:#6b7280;font-weight:700'>${d.getDate()}</div>${badges}${more}</div>`;
+    }).join('');
+  }
+
+  function render(){
+    renderMetrics();
+    if(currentTab==='tasks'){
+      document.getElementById('views').style.display='block';
+      els.calendar.classList.remove('show');
+      if(currentView==='grid') renderGrid(); else renderTable();
+    } else {
+      document.getElementById('views').style.display='none';
+      els.calendar.classList.add('show');
+      renderCalendar();
+    }
+    // toggle active buttons
+    els.tabTasks.classList.toggle('active', currentTab==='tasks');
+    els.tabCalendar.classList.toggle('active', currentTab==='calendar');
+    els.viewTable.classList.toggle('active', currentView==='table');
+    els.viewGrid.classList.toggle('active', currentView==='grid');
+  }
+
+  // ---------- Modals ----------
+  function openModal(t){
+    if(t){
+      els.f_title.value=t.title; els.f_category.value=t.category; els.f_status.value=t.status; els.f_due.value=t.dueDate||''; els.f_next.value=t.nextStep||'';
+    } else {
+      els.f_title.value=''; els.f_category.innerHTML=categories.map(c=>`<option>${c}</option>`).join(''); els.f_category.value=categories[0]; els.f_status.value='Active'; els.f_due.value=''; els.f_next.value='';
+    }
+    // ensure select has options every time
+    if(!els.f_category.options.length){ els.f_category.innerHTML=categories.map(c=>`<option>${c}</option>`).join(''); }
+    els.modal.classList.add('show');
+  }
+  function editTask(id){ const t=tasks.find(x=>x.id===id); if(!t) return; openModal(t); currentEditing=id; }
+  let currentEditing=null;
+
+  // ---------- Category modal ----------
+  function renderCats(){ els.catList.innerHTML=categories.map(c=>`<div style='display:flex;justify-content:space-between;align-items:center;margin:6px 0'><span>${c}</span></div>`).join(''); }
+
+  // ---------- Events ----------
+  els.addTask.addEventListener('click',()=>{ currentEditing=null; openModal(null); });
+  els.closeModal.addEventListener('click',()=> els.modal.classList.remove('show'));
+  els.saveTask.addEventListener('click',()=>{
+    const data={ title:els.f_title.value.trim(), category:els.f_category.value, status:els.f_status.value, dueDate:els.f_due.value||'', nextStep:els.f_next.value.trim() };
+    if(!data.title){ alert('Title is required'); return; }
+    if(currentEditing){ tasks=tasks.map(t=> t.id===currentEditing? {...t,...data}:t); }
+    else { tasks=[{id:Math.random().toString(36).slice(2), ...data}, ...tasks]; }
+    els.modal.classList.remove('show'); currentEditing=null; render();
+  });
+
+  els.manageCats.addEventListener('click',()=>{ renderCats(); els.catModal.classList.add('show'); });
+  els.closeCat.addEventListener('click',()=> els.catModal.classList.remove('show'));
+  els.addCat.addEventListener('click',()=>{
+    const name=els.newCat.value.trim(); if(!name) return; if(!categories.includes(name)) categories.splice(categories.length-1,0,name); els.newCat.value=''; renderCats();
+  });
+
+  els.tabTasks.addEventListener('click',()=>{ currentTab='tasks'; render(); });
+  els.tabCalendar.addEventListener('click',()=>{ currentTab='calendar'; render(); });
+  els.viewGrid.addEventListener('click',()=>{ currentView='grid'; render(); });
+  els.viewTable.addEventListener('click',()=>{ currentView='table'; render(); });
+
+  els.calPrev.addEventListener('click',()=>{ calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()-1,1); render(); });
+  els.calNext.addEventListener('click',()=>{ calCursor=new Date(calCursor.getFullYear(),calCursor.getMonth()+1,1); render(); });
+
+  // ---------- Init ----------
+  // prepare category select for first use
+  els.f_category.innerHTML=categories.map(c=>`<option>${c}</option>`).join('');
+  render();
+})();
+</script>
+</body>
+</html>
